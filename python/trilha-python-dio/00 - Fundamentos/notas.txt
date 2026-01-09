@@ -1,0 +1,4 @@
+fazer o desafio de decoradores, iteradores e geradores
+        desafio de manipulação de arquivos
+        desafio Gerenciamento de Pacotes, Convenções e Boas Práticas Python
+
