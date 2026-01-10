@@ -19,11 +19,30 @@ async def post(
     db_session: DatabaseDependency, 
     categoria_in: CategoriaIn = Body(...)
 ) -> CategoriaOut:
-    categoria_out = CategoriaOut(id=uuid4(), **categoria_in.model_dump())
-    categoria_model = CategoriaModel(**categoria_out.model_dump())
-    
-    db_session.add(categoria_model)
-    await db_session.commit()
+    # 1. Verificar se a categoria já existe pelo nome
+    categoria_existente = (await db_session.execute(
+        select(CategoriaModel).filter_by(nome=categoria_in.nome))
+    ).scalars().first()
+
+    if categoria_existente:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f'Já existe uma categoria cadastrada com o nome: {categoria_in.nome}'
+        )
+
+    # 2. Criar e salvar se não existir
+    try:
+        categoria_out = CategoriaOut(id=uuid4(), **categoria_in.model_dump())
+        categoria_model = CategoriaModel(**categoria_out.model_dump())
+        
+        db_session.add(categoria_model)
+        await db_session.commit()
+    except Exception:
+        await db_session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail='Ocorreu um erro ao inserir a categoria.'
+        )
 
     return categoria_out
     

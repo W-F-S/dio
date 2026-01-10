@@ -19,11 +19,30 @@ async def post(
     db_session: DatabaseDependency, 
     centro_treinamento_in: CentroTreinamentoIn = Body(...)
 ) -> CentroTreinamentoOut:
-    centro_treinamento_out = CentroTreinamentoOut(id=uuid4(), **centro_treinamento_in.model_dump())
-    centro_treinamento_model = CentroTreinamentoModel(**centro_treinamento_out.model_dump())
-    
-    db_session.add(centro_treinamento_model)
-    await db_session.commit()
+    # 1. Verificar se o Centro de Treinamento já existe pelo nome
+    centro_existente = (await db_session.execute(
+        select(CentroTreinamentoModel).filter_by(nome=centro_treinamento_in.nome))
+    ).scalars().first()
+
+    if centro_existente:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f'Já existe um centro de treinamento cadastrado com o nome: {centro_treinamento_in.nome}'
+        )
+
+    # 2. Criar e salvar
+    try:
+        centro_treinamento_out = CentroTreinamentoOut(id=uuid4(), **centro_treinamento_in.model_dump())
+        centro_treinamento_model = CentroTreinamentoModel(**centro_treinamento_out.model_dump())
+        
+        db_session.add(centro_treinamento_model)
+        await db_session.commit()
+    except Exception:
+        await db_session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail='Ocorreu um erro ao inserir o centro de treinamento.'
+        )
 
     return centro_treinamento_out
     
